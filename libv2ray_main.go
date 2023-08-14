@@ -16,9 +16,9 @@ import (
 
 	mobasset "golang.org/x/mobile/asset"
 
-	v2core "github.com/xtls/xray-core/core"
 	v2net "github.com/xtls/xray-core/common/net"
 	v2filesystem "github.com/xtls/xray-core/common/platform/filesystem"
+	v2core "github.com/xtls/xray-core/core"
 	v2stats "github.com/xtls/xray-core/features/stats"
 	v2serial "github.com/xtls/xray-core/infra/conf/serial"
 	_ "github.com/xtls/xray-core/main/distro/all"
@@ -62,10 +62,16 @@ type V2RayVPNServiceSupportsSet interface {
 
 /*RunLoop Run V2Ray main loop
  */
-func (v *V2RayPoint) RunLoop(prefIPv6 bool) (err error) {
+func (v *V2RayPoint) RunLoop(prefIPv6 bool, disableLog bool) (err error) {
 	v.v2rayOP.Lock()
 	defer v.v2rayOP.Unlock()
 	//Construct Context
+
+	if disableLog {
+		log.SetOutput(io.Discard)
+	} else {
+		log.SetOutput(os.Stderr)
+	}
 
 	if !v.IsRunning {
 		v.closeChan = make(chan struct{})
@@ -248,7 +254,7 @@ func NewV2RayPoint(s V2RayVPNServiceSupportsSet, adns bool) *V2RayPoint {
 This func will return libv2ray binding version and V2Ray version used.
 */
 func CheckVersionX() string {
-	var version  = 24
+	var version = 24
 	return fmt.Sprintf("Lib v%d, Xray-core v%s", version, v2core.Version())
 }
 
@@ -306,6 +312,6 @@ func (w *consoleLogWriter) Close() error {
 func createStdoutLogWriter() v2commlog.WriterCreator {
 	return func() v2commlog.Writer {
 		return &consoleLogWriter{
-			logger: log.New(os.Stdout, "", 0)}
+			logger: log.New(os.Stderr, "", 0)}
 	}
 }
