@@ -4,17 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	// "log"
 	"net"
 	"os"
 	"sync"
 	"time"
 
-	"golang.org/x/sys/unix"
 	v2net "github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/features/dns"
 	"github.com/xtls/xray-core/features/outbound"
 	v2internet "github.com/xtls/xray-core/transport/internet"
+	"golang.org/x/sys/unix"
 )
 
 type protectSet interface {
@@ -44,7 +44,7 @@ func (r *resolved) NextIP() {
 		// throttle, don't switch too quickly
 		now := time.Now()
 		if now.Sub(r.lastSwitched) < time.Second*5 {
-			log.Println("switch too quickly")
+			// log.Println("switch too quickly")
 			return
 		}
 		r.lastSwitched = now
@@ -58,7 +58,7 @@ func (r *resolved) NextIP() {
 		r.ipIdx = 0
 	}
 
-	log.Printf("switched to next IP: %v", r.IPs[r.ipIdx])
+	// log.Printf("switched to next IP: %v", r.IPs[r.ipIdx])
 }
 
 func (r *resolved) currentIP() net.IP {
@@ -118,12 +118,12 @@ func (d *ProtectedDialer) lookupAddr(addr string) (*resolved, error) {
 	defer cancel()
 
 	if host, port, err = net.SplitHostPort(addr); err != nil {
-		log.Printf("PrepareDomain SplitHostPort Err: %v", err)
+		// log.Printf("PrepareDomain SplitHostPort Err: %v", err)
 		return nil, err
 	}
 
 	if portnum, err = d.resolver.LookupPort(ctx, "tcp", port); err != nil {
-		log.Printf("PrepareDomain LookupPort Err: %v", err)
+		// log.Printf("PrepareDomain LookupPort Err: %v", err)
 		return nil, err
 	}
 
@@ -138,24 +138,24 @@ func (d *ProtectedDialer) lookupAddr(addr string) (*resolved, error) {
 	IPs := make([]net.IP, 0)
 	//ipv6 is prefer, append ipv6 then ipv4
 	//ipv6 is not prefer, append ipv4 then ipv6
-	if(d.preferIPv6) {
+	if d.preferIPv6 {
 		for _, ia := range addrs {
-			if(ia.IP.To4() == nil) {
-				IPs = append(IPs, ia.IP)			 
+			if ia.IP.To4() == nil {
+				IPs = append(IPs, ia.IP)
 			}
-		}		
-	}
-	for _, ia := range addrs {
-		if(ia.IP.To4() != nil) {
-			IPs = append(IPs, ia.IP)	
 		}
 	}
-	if(!d.preferIPv6) {
+	for _, ia := range addrs {
+		if ia.IP.To4() != nil {
+			IPs = append(IPs, ia.IP)
+		}
+	}
+	if !d.preferIPv6 {
 		for _, ia := range addrs {
-			if(ia.IP.To4() == nil) {
-				IPs = append(IPs, ia.IP)			 
+			if ia.IP.To4() == nil {
+				IPs = append(IPs, ia.IP)
 			}
-		}		
+		}
 	}
 
 	rs := &resolved{
@@ -170,24 +170,24 @@ func (d *ProtectedDialer) lookupAddr(addr string) (*resolved, error) {
 
 // PrepareDomain caches direct v2ray server host
 func (d *ProtectedDialer) PrepareDomain(domainName string, closeCh <-chan struct{}, prefIPv6 bool) {
-	log.Printf("Preparing Domain: %s", domainName)
+	// log.Printf("Preparing Domain: %s", domainName)
 	d.currentServer = domainName
 	d.preferIPv6 = prefIPv6
 
 	maxRetry := 10
 	for {
 		if maxRetry == 0 {
-			log.Println("PrepareDomain maxRetry reached. exiting.")
+			// log.Println("PrepareDomain maxRetry reached. exiting.")
 			return
 		}
 
 		resolved, err := d.lookupAddr(domainName)
 		if err != nil {
 			maxRetry--
-			log.Printf("PrepareDomain err: %v\n", err)
+			// log.Printf("PrepareDomain err: %v\n", err)
 			select {
 			case <-closeCh:
-				log.Printf("PrepareDomain exit due to core closed")
+				// log.Printf("PrepareDomain exit due to core closed")
 				return
 			case <-time.After(time.Second * 2):
 			}
@@ -195,8 +195,8 @@ func (d *ProtectedDialer) PrepareDomain(domainName string, closeCh <-chan struct
 		}
 
 		d.vServer = resolved
-		log.Printf("Prepare Result:\n Domain: %s\n Port: %d\n IPs: %v\n",
-			resolved.domain, resolved.Port, resolved.IPs)
+		// log.Printf("Prepare Result:\n Domain: %s\n Port: %d\n IPs: %v\n",
+		// 	resolved.domain, resolved.Port, resolved.IPs)
 		return
 	}
 }
@@ -222,7 +222,7 @@ func (d *ProtectedDialer) Init(_ dns.Client, _ outbound.Manager) {
 func (d *ProtectedDialer) Dial(ctx context.Context,
 	src v2net.Address, dest v2net.Destination, sockopt *v2internet.SocketConfig) (net.Conn, error) {
 
-	network := dest.Network.SystemString()
+	// network := dest.Network.SystemString()
 	Address := dest.NetAddr()
 
 	// v2ray server address,
@@ -230,7 +230,7 @@ func (d *ProtectedDialer) Dial(ctx context.Context,
 	// and switch to next IP if error occurred
 	if Address == d.currentServer {
 		if d.vServer == nil {
-			log.Println("Dial pending prepare  ...", Address)
+			// log.Println("Dial pending prepare  ...", Address)
 			<-d.resolveChan
 
 			// user may close connection during PrepareDomain,
@@ -255,12 +255,12 @@ func (d *ProtectedDialer) Dial(ctx context.Context,
 			d.vServer.NextIP()
 			return nil, err
 		}
-		log.Printf("Using Prepared: %s", curIP)
+		// log.Printf("Using Prepared: %s", curIP)
 		return conn, nil
 	}
 
 	// v2ray connecting to "domestic" servers, no caching results
-	log.Printf("Not Using Prepared: %s,%s", network, Address)
+	// log.Printf("Not Using Prepared: %s,%s", network, Address)
 	resolved, err := d.lookupAddr(Address)
 	if err != nil {
 		return nil, err
@@ -286,7 +286,7 @@ func (d *ProtectedDialer) fdConn(ctx context.Context, ip net.IP, port int, fd in
 
 	// call android VPN service to "protect" the fd connecting straight out
 	if !d.Protect(fd) {
-		log.Printf("fdConn fail to protect, Close Fd: %d", fd)
+		// log.Printf("fdConn fail to protect, Close Fd: %d", fd)
 		return nil, errors.New("fail to protect")
 	}
 
@@ -296,7 +296,7 @@ func (d *ProtectedDialer) fdConn(ctx context.Context, ip net.IP, port int, fd in
 	copy(sa.Addr[:], ip.To16())
 
 	if err := unix.Connect(fd, sa); err != nil {
-		log.Printf("fdConn unix.Connect err, Close Fd: %d Err: %v", fd, err)
+		// log.Printf("fdConn unix.Connect err, Close Fd: %d Err: %v", fd, err)
 		return nil, err
 	}
 
@@ -310,7 +310,7 @@ func (d *ProtectedDialer) fdConn(ctx context.Context, ip net.IP, port int, fd in
 	//Closing conn does not affect file, and closing file does not affect conn.
 	conn, err := net.FileConn(file)
 	if err != nil {
-		log.Printf("fdConn FileConn Close Fd: %d Err: %v", fd, err)
+		// log.Printf("fdConn FileConn Close Fd: %d Err: %v", fd, err)
 		return nil, err
 	}
 
